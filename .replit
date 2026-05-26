@@ -24,12 +24,13 @@ args = "Reddit Lead Monitor"
 name = "Reddit Lead Monitor"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python3 main.py"
-
-[workflows.workflow.metadata]
-outputType = "console"
+args = "PORT=3000 python3 artifacts/lead-monitor/monitor_app.py"
+waitForPort = 3000
 
 [agent]
 stack = "PNPM_WORKSPACE"
