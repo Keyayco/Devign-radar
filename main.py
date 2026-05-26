@@ -14,10 +14,10 @@ import time
 # =============================================================================
 
 # Your Telegram bot token (from @BotFather on Telegram)
-TELEGRAM_BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
+TELEGRAM_BOT_TOKEN = "8968597568:AAEyUbpcjj_e8C-ZSWYHda3KEXUY6I7khsY"
 
 # Your Telegram chat ID (use @userinfobot to find yours)
-TELEGRAM_CHAT_ID = "YOUR_CHAT_ID_HERE"
+TELEGRAM_CHAT_ID = "7116100851"
 
 # Reddit RSS feeds to monitor.
 # Format: https://www.reddit.com/r/<subreddit>/.rss
