@@ -1,0 +1,14 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "gOpA--D-R9oE24Q7jfw90"
+uri = "file://CHANGES.md"
+type = "text"
+title = "CHANGES.md — Phase 1–8 Change Log"
+
+[[outputs]]
+id = "z7fi4PKf2WAJxL0t0-t8N"
+uri = "file://README.md"
+type = "text"
+title = "README.md — Project README"
