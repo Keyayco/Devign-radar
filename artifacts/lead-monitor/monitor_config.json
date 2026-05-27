@@ -1,0 +1,35 @@
+{
+  "bot_token": "YOUR_BOT_TOKEN_HERE",
+  "chat_id": "YOUR_CHAT_ID_HERE",
+  "interval": 120,
+  "feeds": [
+    "https://www.reddit.com/r/Entrepreneur/.rss",
+    "https://www.reddit.com/r/smallbusiness/.rss",
+    "https://www.reddit.com/r/forhire/.rss",
+    "https://www.reddit.com/r/hireafreelancer/.rss",
+    "https://www.reddit.com/r/webdesign/.rss"
+  ],
+  "keywords": [
+    "need a website",
+    "looking for a website",
+    "want a website",
+    "build me a website",
+    "hire a web developer",
+    "need web developer",
+    "looking for web developer",
+    "need a landing page",
+    "want a landing page",
+    "need a web designer",
+    "looking for web designer",
+    "website redesign",
+    "need ecommerce",
+    "need an online store",
+    "build a website",
+    "website quote",
+    "website budget",
+    "how much does a website cost",
+    "wordpress developer",
+    "shopify developer"
+  ],
+  "seen_post_ids": []
+}
