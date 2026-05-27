@@ -219,6 +219,15 @@ importers:
         specifier: 3.1.0
         version: 3.1.0
 
+  artifacts/lead-monitor:
+    dependencies:
+      better-sqlite3:
+        specifier: ^12.10.0
+        version: 12.10.0
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
+
   artifacts/mockup-sandbox:
     devDependencies:
       '@hookform/resolvers':

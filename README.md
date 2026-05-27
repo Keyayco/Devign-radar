@@ -1,249 +1,272 @@
 # Reddit Lead Intelligence Platform
 
-A real-time Reddit monitoring system that finds high-intent business leads,
-scores them by buying intent, stores them in SQLite, and sends Telegram alerts —
-all controlled from a mobile-responsive dark dashboard.
+Real-time Reddit monitoring that finds, scores, and stores business leads.  
+Dark dashboard, Telegram alerts, SQLite persistence, SSE streaming.
+
+**Stack: Vanilla HTML/CSS/JS · Plain Express.js · Python worker · SQLite · No build step.**
 
 ---
 
-## What It Does
+## Quick Start
 
-1. **Monitors** Reddit RSS feeds every N seconds for configurable keywords
-2. **Scores** each matching post on a 0–100 buying-intent scale
-3. **Classifies** leads as `high`, `medium`, or `low` intent
-4. **Stores** every lead permanently in SQLite (no duplicates across restarts)
-5. **Alerts** you via Telegram for medium and high intent leads only
-6. **Streams** logs, new leads, and stats to the dashboard in real time via SSE
+```bash
+cd artifacts/lead-monitor
+npm install
+pip install -r requirements.txt
+node server.js
+# Dashboard → http://localhost:3001/
+```
 
 ---
 
 ## Architecture
 
 ```
-Browser (Vanilla HTML/CSS/JS)
-  │  EventSource SSE ────────────────────────────────────────────────┐
-  │  fetch() REST calls ──────────────────────┐                      │
-  ▼                                           ▼                      │
-Express API Server (Node.js / TypeScript)     │                      │
-  │  routes/monitor.ts  ← 10 REST endpoints  ◄┘                     │
-  │  lib/monitor-db.ts  ← SQLite (better-sqlite3)                    │
-  │  lib/worker-manager.ts ← subprocess + SSE broadcast ────────────►│
+Browser (dashboard.html + styles.css + app.js)
+  │
+  │  EventSource SSE ────────────────────────────────────────────────────────┐
+  │  fetch() REST ──────────────────────────────────────────────┐            │
+  ▼                                                             ▼            │
+server.js (Express 4, plain JS)                                              │
+  │  routes/monitor.js   — 10 REST endpoints                   ◄────────────┘
+  │  lib/db.js           — SQLite (better-sqlite3, sync)
+  │  lib/worker-manager.js  — subprocess + SSE broadcast
+  │
   │  spawn("python3", ["-u", "worker.py"])
   ▼
-Python Worker (worker.py)
-  │  feedparser + requests → Reddit RSS feeds
-  │  Intent scoring (high/medium/low)
-  │  Telegram alerts (medium + high only)
-  └─ stdout JSON lines ──► Express ──► SQLite + SSE ──► Browser
+worker.py
+  │  feedparser   — Reddit RSS feeds (ETag cached)
+  │  requests     — Telegram alerts
+  │  Intent score — 0-100, HIGH ≥70 / MEDIUM 45-69 / LOW <45
+  └──▶ JSON lines on stdout ──▶ Express ──▶ SQLite + SSE ──▶ Browser
 ```
 
-**No React. No Vue. No frontend framework. Pure HTML/CSS/JS.**
+**No React. No TypeScript. No build step. Just `node server.js`.**
 
 ---
 
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| `artifacts/lead-monitor/dashboard.html` | Standalone vanilla dashboard (HTML/CSS/JS) |
-| `artifacts/lead-monitor/worker.py` | Python RSS scanner + intent scorer |
-| `artifacts/lead-monitor/monitor_config.json` | Runtime config (auto-created) |
-| `artifacts/api-server/src/routes/monitor.ts` | Express route handlers |
-| `artifacts/api-server/src/lib/monitor-db.ts` | SQLite schema + queries |
-| `artifacts/api-server/src/lib/worker-manager.ts` | Worker lifecycle + SSE |
-| `lead_monitor.db` | SQLite database (workspace root, auto-created) |
-| `logs/monitor.log` | Persistent log file (workspace root, auto-created) |
-
----
-
-## Setup
-
-### 1. Install dependencies
-
-```bash
-pnpm install
-```
-
-Python packages (if not already installed):
-```bash
-pip install feedparser requests
-```
-
-### 2. Start the server
-
-The Express API server runs via the configured workflow:
-
-```bash
-pnpm --filter @workspace/api-server run dev
-```
-
-### 3. Open the dashboard
-
-Navigate to `/api/monitor` in the browser preview pane.
-
-### 4. Configure Telegram (optional)
-
-1. Create a Telegram bot via [@BotFather](https://t.me/botfather) — copy the token
-2. Get your Chat ID via [@userinfobot](https://t.me/userinfobot)
-3. Open the **Config** tab in the dashboard
-4. Paste the token and chat ID → **Save Config**
-
-> The token is never returned by the API — only `token_configured: true/false`
-> is shown in the UI.
-
-### 5. Start monitoring
-
-Click **▶ Start Monitor** in the dashboard.
-
----
-
-## Dashboard Tabs
-
-### Monitor
-- Live log streaming directly from Python stdout via SSE
-- Session stats: cycles / leads found / alerts sent
-- Start / Stop controls
-
-### Leads
-- Filter by intent: All | High | Medium | Low
-- Score bar (0–100), colour-coded intent badge, subreddit, linked title, keyword
-- Status tags: **New** → **Contacted** → **Ignored** → **Won**
-- Status saved to SQLite immediately on change
-
-### Config
-- Telegram token (write-only — never displayed after save)
-- Telegram chat ID
-- Check interval (minimum 30 seconds)
-- RSS feed list (one per line)
-- Keyword list (one per line)
-
----
-
-## Intent Scoring
-
-Scores are additive. Final score is clamped 0–100.
-
-### High intent keywords (+20 to +40 pts each)
-`hire`, `hiring`, `freelancer needed`, `need developer`, `budget`, `quote`,
-`paying`, `asap`, `urgent`, `contract`, `build my`, `need someone to`, …
-
-### Low intent keywords (−10 to −25 pts each)
-`feedback`, `critique`, `showcase`, `what do you think`, `rate my`,
-`roast my`, `i made`, `i built`, `side project`, `for fun`, `wip`, …
-
-### Classification thresholds
-| Score | Intent |
-|-------|--------|
-| ≥ 60  | `high` — Telegram alert sent |
-| ≥ 25  | `medium` — Telegram alert sent |
-| < 25  | `low` — stored silently |
-
----
-
-## Default Keywords (web dev leads)
+## File Map
 
 ```
-need a website, looking for a website, build me a website,
-hire a web developer, need web developer, looking for web designer,
-website redesign, need ecommerce, website quote, website budget,
-wordpress developer, shopify developer, how much does a website cost …
-```
-
-Edit freely via the Config tab.
-
----
-
-## Default Feeds
-
-```
-r/Entrepreneur, r/smallbusiness, r/forhire,
-r/hireafreelancer, r/webdesign
-```
-
-Edit freely via the Config tab (one RSS URL per line).
-
----
-
-## Database Schema
-
-```sql
-CREATE TABLE leads (
-  id                   INTEGER PRIMARY KEY AUTOINCREMENT,
-  reddit_post_id       TEXT UNIQUE NOT NULL,   -- dedup key
-  subreddit            TEXT NOT NULL,
-  title                TEXT NOT NULL,
-  content              TEXT,
-  url                  TEXT NOT NULL,
-  matched_keyword      TEXT NOT NULL,
-  score                INTEGER DEFAULT 0,
-  intent               TEXT DEFAULT 'low',     -- high | medium | low
-  status               TEXT DEFAULT 'new',     -- new | contacted | ignored | won
-  ai_summary           TEXT,                   -- reserved for future AI
-  ai_score             INTEGER,                -- reserved for future AI
-  ai_reply_suggestion  TEXT,                   -- reserved for future AI
-  created_at           DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE outreach (
-  id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  lead_id        INTEGER REFERENCES leads(id),
-  message        TEXT,
-  sent           INTEGER DEFAULT 0,
-  reply_received INTEGER DEFAULT 0,
-  created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+artifacts/lead-monitor/
+├── server.js              ← Express entry point
+├── package.json           ← express + better-sqlite3 only
+├── requirements.txt       ← feedparser, requests
+├── .env.example           ← PORT, BASE_PATH
+├── routes/
+│   └── monitor.js         ← All 10 API endpoints
+├── lib/
+│   ├── db.js              ← SQLite schema + queries
+│   └── worker-manager.js  ← Worker lifecycle + SSE
+├── frontend/
+│   ├── dashboard.html     ← Pure HTML (no inline CSS/JS)
+│   ├── styles.css         ← All styles (~580 lines)
+│   └── app.js             ← All JS (~310 lines)
+├── worker.py              ← Reddit scanner + scorer
+│
+├── lead_monitor.db        ← Auto-created SQLite DB
+├── monitor_config.json    ← Auto-created config
+└── logs/monitor.log       ← Auto-created log file
 ```
 
 ---
 
 ## API Reference
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/monitor` | Dashboard HTML |
-| `GET` | `/api/monitor/stream` | SSE stream |
-| `POST` | `/api/monitor/start` | Start worker |
-| `POST` | `/api/monitor/stop` | Stop worker |
-| `GET` | `/api/monitor/status` | `{ running, stats }` |
-| `GET` | `/api/monitor/logs` | Recent log lines |
-| `GET` | `/api/monitor/config` | Safe config (no token) |
-| `POST` | `/api/monitor/config` | Update config |
-| `GET` | `/api/monitor/leads?intent=high` | Leads (filterable) |
-| `PATCH` | `/api/monitor/leads/:id` | Update status |
+| Method  | Endpoint             | Description                                |
+|---------|----------------------|--------------------------------------------|
+| `GET`   | `/api/stream`        | SSE (log / lead / stats / status events)   |
+| `GET`   | `/api/status`        | `{ running, stats, db }`                   |
+| `GET`   | `/api/logs`          | Recent log buffer (page-load hydration)    |
+| `POST`  | `/api/start`         | Spawn Python worker                        |
+| `POST`  | `/api/stop`          | Kill Python worker                         |
+| `GET`   | `/api/config`        | Safe config — token **never** returned     |
+| `POST`  | `/api/config`        | Update & persist config                    |
+| `GET`   | `/api/leads`         | Leads (optional `?intent=&sort=`)          |
+| `PATCH` | `/api/leads/:id`     | Update lead status                         |
+
+When running behind Replit proxy at `/monitor`, prefix all paths: `/monitor/api/...`
+
+---
+
+## Database Schema
+
+```sql
+leads (
+  id                  INTEGER PRIMARY KEY,
+  reddit_post_id      TEXT UNIQUE,    -- normalized permalink (dedup key)
+  subreddit           TEXT,
+  title               TEXT,
+  content             TEXT,
+  url                 TEXT,
+  matched_keyword     TEXT,
+  score               INTEGER,        -- 0-100 intent score
+  intent              TEXT,           -- high | medium | low
+  lead_value          INTEGER,        -- 0-100 business value estimate
+  status              TEXT,           -- new | contacted | ignored | won
+  created_utc         INTEGER,        -- Unix timestamp of original post
+  ai_summary          TEXT,           -- reserved for future AI
+  ai_score            INTEGER,        -- reserved for future AI
+  ai_reply_suggestion TEXT,           -- reserved for future AI
+  created_at          DATETIME
+)
+
+outreach ( id, lead_id, message, sent, reply_received, created_at )
+scan_stats ( id, cycle, posts_checked, matches_found, dupes_skipped, scan_ms, alerts_sent )
+```
+
+---
+
+## Intent Scoring
+
+Additive score, clamped 0–100. Multiple negative signals suppress heavily.
+
+| Tier    | Score    | Examples                                                    |
+|---------|----------|-------------------------------------------------------------|
+| HIGH    | ≥ 70     | "developer disappeared" (+45), "hiring" (+30), "budget" (+30) |
+| MEDIUM  | 45–69    | "launch my" (+20), "urgent" (+25), "local business" (+18)  |
+| LOW     | < 45     | "what do you think" (−32), "showcase" (−32), "portfolio" (−30) |
+
+Telegram alerts sent for **medium + high** only.
+
+Detailed scoring logs in the live log:
+```
+[SCORE] +38 "need developer"  +30 "budget"  -26 "feedback"
+```
+
+---
+
+## Deduplication
+
+Cross-session deduplication is permanent and double-layered:
+
+1. **Python in-memory `seen_ids` set** — seeded from DB at every startup via `seen_post_ids` in `monitor_config.json`. Prevents re-scoring within a session.
+2. **SQLite `UNIQUE` on `reddit_post_id`** — `INSERT OR IGNORE` prevents duplicates even if Python misses one (race condition guard).
+3. **URL normalisation** — query params stripped, host normalized to `www.reddit.com`, path lowercased, trailing slash removed.
+
+```
+[DEDUP] Skipping known post: "Need a web developer for my startup..."
+```
+
+---
+
+## Lead Value Score
+
+Separate from intent score. Estimates business ROI of the lead (0–100, base = 50).
+
+| Signal              | Delta |
+|---------------------|-------|
+| saas                | +20   |
+| agency, ecommerce   | +16–18|
+| shopify, startup    | +14–16|
+| hobby, student      | −20–22|
+| for fun, learning   | −18–22|
+
+---
+
+## Lead Management
+
+From the **Leads tab**:
+
+- **Filter**: All | High | Medium | Low
+- **Sort**: Newest | Highest Score | Highest Value
+- **Age badges**: Just now / Xm ago / Xh ago / Xd ago (from original post `created_utc`)
+- **Status tags**: New → Contacted → Ignored → Won (saved to DB on change)
+- **Quick actions**: Open Reddit ↗ | Copy link 📋 | Mark Contacted 📧 | Mark Won ✅
 
 ---
 
 ## Worker Reliability
 
-- **Crash detection:** if the worker exits while `isRunning` is true, it restarts automatically
-- **Exponential back-off:** 5s → 10s → 20s → 40s → 60s (max) between restarts
-- **Clean stop:** SIGTERM sent; SIGKILL follows 5 seconds later if still alive
-- **Deduplication:** `seen_ids` seeded from SQLite at each start — no re-alerts on restart
-- **ETag caching:** HTTP 304 Not Modified respected — unchanged feeds skip reprocessing
+| Feature              | Behaviour                                              |
+|----------------------|--------------------------------------------------------|
+| Crash recovery       | Auto-restart if worker exits unexpectedly              |
+| Back-off             | 5s → 10s → 20s → 40s → 60s max between restart attempts |
+| Clean stop           | SIGTERM sent; SIGKILL after 5 s if still alive         |
+| ETag caching         | `If-None-Match` / `If-Modified-Since` headers; 304 skipped |
+| Log persistence      | All logs appended to `logs/monitor.log`                |
+| SSE keep-alive       | `: ping` comment every 25 s to survive proxy timeouts  |
+
+---
+
+## Setup
+
+### 1. Telegram (optional)
+
+1. Message [@BotFather](https://t.me/botfather) → `/newbot` → copy the token
+2. Message [@userinfobot](https://t.me/userinfobot) → copy your chat ID
+3. Open **Config tab** → paste token + chat ID → **Save Config**
+
+The token is **write-only** — the API never returns it. Only `token_configured: true/false` is exposed.
+
+### 2. Feeds & Keywords
+
+Defaults (editable via Config tab):
+
+**Feeds:** r/Entrepreneur, r/smallbusiness, r/forhire, r/hireafreelancer, r/webdesign
+
+**Keywords:** need a website, looking for a website, hire a web developer, website redesign, shopify developer, need ecommerce, developer disappeared, freelancer needed…
+
+### 3. Start
+
+Click **▶ Start Monitor**. Logs stream in real time via SSE.
+
+---
+
+## Deployment
+
+See **[DEPLOY.md](./DEPLOY.md)** for full guides:
+- Local / VPS (systemd + nginx)
+- Railway
+- Render
+- SQLite backup strategy
+
+---
+
+## Security
+
+- Telegram token stored only in `monitor_config.json` (local file)
+- `GET /api/config` returns `token_configured: boolean` — never the token value
+- Config form clears the password field after save
+- No external dependencies beyond `express` and `better-sqlite3`
+- No authentication layer by default — add nginx basic auth for public VPS
 
 ---
 
 ## Future AI Hook
 
-The schema is ready. To add AI classification, populate these fields per lead:
+Schema columns already exist. No migration needed to add AI:
 
-```typescript
-lead.ai_summary          = await gpt.summarize(lead.content);
-lead.ai_score            = await gpt.scoreIntent(lead.title, lead.content);
-lead.ai_reply_suggestion = await gpt.draftReply(lead.title, lead.subreddit);
+```javascript
+// In routes/monitor.js or a new /api/leads/:id/analyze endpoint:
+lead.ai_summary          = await openai.summarize(lead.content);
+lead.ai_score            = await openai.scoreIntent(lead.title, lead.content);
+lead.ai_reply_suggestion = await openai.draftReply(lead.title, lead.subreddit);
 ```
-
-No database migration needed — columns already exist.
 
 ---
 
-## Stack
+## Troubleshooting
 
-| Layer | Tech |
-|-------|------|
-| Frontend | Vanilla HTML5 / CSS3 / ES2023 JS |
-| Backend | Express 5 + TypeScript (Node.js 24) |
-| Database | SQLite via `better-sqlite3` |
-| Worker | Python 3 (`feedparser`, `requests`) |
-| Realtime | Server-Sent Events (SSE) |
-| Build | esbuild (ESM bundle) |
+| Symptom                    | Fix                                                             |
+|----------------------------|-----------------------------------------------------------------|
+| Dashboard blank            | Check `BASE_PATH` env var matches proxy path                   |
+| SSE shows "SSE" not "Live" | Check server is running; browser EventSource auto-reconnects    |
+| No leads found             | Check keywords vs actual post titles; lower scoring thresholds |
+| Leads repeating on restart | Check `seen_post_ids` is written to `monitor_config.json`       |
+| Telegram not alerting      | Confirm score ≥ 45 (medium); verify token + chat ID in Config  |
+| worker.py not found        | Ensure `node server.js` runs from `artifacts/lead-monitor/` dir |
+| SQLite error on start      | Delete `lead_monitor.db` to reset (loses all stored leads)     |
+
+---
+
+## Stack Versions
+
+| Component    | Version  |
+|--------------|----------|
+| Node.js      | ≥ 18     |
+| Express      | 4.x      |
+| better-sqlite3 | 9.x    |
+| Python       | ≥ 3.9    |
+| feedparser   | ≥ 6.0    |
+| requests     | ≥ 2.31   |

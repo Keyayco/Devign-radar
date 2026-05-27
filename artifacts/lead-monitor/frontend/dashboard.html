@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reddit Lead Intel</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- ══ HEADER ════════════════════════════════════════════════════════════════ -->
+<header id="app-header">
+  <div class="hdr-left">
+    <span class="logo">Reddit <span class="accent">Lead</span> Intel</span>
+    <span class="logo-sub">Express · Python · SQLite · SSE</span>
+  </div>
+  <div class="hdr-right">
+    <span class="status-badge" id="status-badge">
+      <span class="status-dot" id="status-dot"></span>
+      <span id="status-text">Stopped</span>
+    </span>
+    <span class="sse-pill" id="sse-pill">
+      <span class="sse-dot" id="sse-dot"></span>
+      <span id="sse-lbl">SSE</span>
+    </span>
+  </div>
+</header>
+
+<!-- ══ TAB BAR ═══════════════════════════════════════════════════════════════ -->
+<nav class="tabbar">
+  <button class="tab active" data-tab="monitor">Monitor</button>
+  <button class="tab" data-tab="leads">Leads <span class="tab-badge" id="lead-count">0</span></button>
+  <button class="tab" data-tab="config">Config</button>
+</nav>
+
+<main>
+
+  <!-- ══ MONITOR TAB ════════════════════════════════════════════════════════ -->
+  <section class="tab-panel active" id="tab-monitor">
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-num" id="s-cycles">0</div><div class="stat-lbl">Cycles</div></div>
+      <div class="stat-card"><div class="stat-num" id="s-leads">0</div><div class="stat-lbl">Leads Found</div></div>
+      <div class="stat-card"><div class="stat-num" id="s-alerts">0</div><div class="stat-lbl">Alerts Sent</div></div>
+      <div class="stat-card"><div class="stat-num" id="s-dupes">0</div><div class="stat-lbl">Dupes Skipped</div></div>
+      <div class="stat-card"><div class="stat-num" id="s-avg">—</div><div class="stat-lbl">Avg Score</div></div>
+      <div class="stat-card"><div class="stat-num stat-sm" id="s-scan">—</div><div class="stat-lbl">Last Scan</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Controls</div>
+      <div class="btn-row">
+        <button class="btn btn-start" id="btn-start" onclick="startMonitor()">▶ Start Monitor</button>
+        <button class="btn btn-stop"  id="btn-stop"  onclick="stopMonitor()" disabled>■ Stop</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Architecture</div>
+      <pre class="arch"><span class="c-blue">Browser (HTML/CSS/JS)</span> <span class="c-dim">──EventSource SSE──▶</span> <span class="c-indigo">Express (Node.js)</span> <span class="c-dim">──spawn()──▶</span> <span class="c-green">Python</span>
+<span class="c-green">Python</span> <span class="c-dim">fetches RSS → scores intent → emits JSON lines ──▶ Express ──▶ SQLite + SSE</span>
+<span class="c-dim">Telegram alerts:</span> <span class="c-green">medium</span> <span class="c-dim">+</span> <span class="c-orange">high</span> <span class="c-dim">intent only (score ≥ 45)   HIGH = 70+   MEDIUM = 45–69</span></pre>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <span>Live Log <span class="c-dim">(Python stdout → Express → SSE)</span></span>
+        <label class="chk-label"><input type="checkbox" id="auto-scroll" checked /> Auto-scroll</label>
+      </div>
+      <div id="log-box"><span class="log-placeholder">Waiting for monitor to start…</span></div>
+    </div>
+
+  </section>
+
+  <!-- ══ LEADS TAB ══════════════════════════════════════════════════════════ -->
+  <section class="tab-panel" id="tab-leads">
+    <div class="card">
+      <div class="card-head">
+        <span>Recent Leads</span>
+        <span class="c-dim" id="leads-meta">0 total</span>
+      </div>
+
+      <div class="filter-sort-bar">
+        <div class="pills">
+          <button class="pill active"  data-filter="all"    onclick="setFilter('all')">All</button>
+          <button class="pill f-high"  data-filter="high"   onclick="setFilter('high')">High</button>
+          <button class="pill f-med"   data-filter="medium" onclick="setFilter('medium')">Medium</button>
+          <button class="pill f-low"   data-filter="low"    onclick="setFilter('low')">Low</button>
+        </div>
+        <div class="sort-wrap">
+          <label class="sort-lbl">Sort:</label>
+          <select id="sort-sel" class="sort-sel" onchange="setSort(this.value)">
+            <option value="created_at">Newest</option>
+            <option value="score">Highest Score</option>
+            <option value="value">Highest Value</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Score</th>
+              <th>Intent</th>
+              <th>Value</th>
+              <th>Sub</th>
+              <th>Title</th>
+              <th>Keyword</th>
+              <th>Age</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="leads-tbody">
+            <tr><td colspan="9" class="empty-cell">No leads yet — start the monitor to begin scanning</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ CONFIG TAB ═════════════════════════════════════════════════════════ -->
+  <section class="tab-panel" id="tab-config">
+
+    <div class="card">
+      <div class="card-head">Telegram Alerts</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Bot Token</label>
+          <input type="password" id="cfg-token" placeholder="Paste new token to update…" autocomplete="off" />
+          <div class="field-hint">
+            <span id="token-status" class="cfg-status cfg-no">○ Not configured</span>
+            — get from <a href="https://t.me/botfather" target="_blank" rel="noopener">@BotFather</a>.
+            Leave blank to keep existing.
+          </div>
+        </div>
+        <div class="field">
+          <label>Chat ID</label>
+          <input type="text" id="cfg-chatid" placeholder="-100123456789" />
+          <div class="field-hint">
+            <span id="chatid-status" class="cfg-status cfg-no">○ Not configured</span>
+            — get from <a href="https://t.me/userinfobot" target="_blank" rel="noopener">@userinfobot</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Monitor Settings</div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Check Interval (seconds)</label>
+          <input type="number" id="cfg-interval" min="30" step="30" value="120" />
+          <div class="field-hint">Minimum 30 s. Takes effect on next start.</div>
+        </div>
+        <div class="field"></div>
+        <div class="field full">
+          <label>Reddit RSS Feeds (one per line)</label>
+          <textarea id="cfg-feeds" rows="5" placeholder="https://www.reddit.com/r/forhire/.rss"></textarea>
+          <div class="field-hint">Format: <code>https://www.reddit.com/r/subreddit/.rss</code></div>
+        </div>
+        <div class="field full">
+          <label>Keywords to Watch (one per line, case-insensitive)</label>
+          <textarea id="cfg-keywords" rows="7"></textarea>
+          <div class="field-hint">Each keyword is searched in the post title + body. Intent scoring is separate.</div>
+        </div>
+      </div>
+      <div class="save-row">
+        <button class="btn btn-save" onclick="saveConfig()">💾 Save Config</button>
+        <span class="save-msg" id="save-msg">Saved ✓</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">Scoring Reference</div>
+      <pre class="arch"><span class="c-green">HIGH intent (+18 to +45 pts):</span>  <span class="c-dim">developer disappeared, replacing developer, freelancer needed,
+  need developer, hiring, budget, paying, shopify help, ecommerce, client work…</span>
+<span class="c-orange">LOW intent  (−15 to −35 pts):</span>  <span class="c-dim">rate my, roast, what do you think, showcase, portfolio,
+  dribbble, behance, i made, i built, for fun, concept, mockup, wip, side project…</span>
+<span class="c-indigo">Thresholds:</span>  <span class="c-dim">score ≥ 70 → HIGH | score 45–69 → MEDIUM | &lt; 45 → LOW</span>
+<span class="c-dim">Telegram alerts sent for MEDIUM + HIGH only. Multiple negatives suppress score heavily.</span></pre>
+    </div>
+
+  </section>
+
+</main>
+
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

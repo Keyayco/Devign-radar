@@ -29,8 +29,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "PORT=3000 python3 artifacts/lead-monitor/monitor_app.py"
-waitForPort = 3000
+args = "BASE_PATH=/monitor PORT=3001 node artifacts/lead-monitor/server.js"
 
 [agent]
 stack = "PNPM_WORKSPACE"

@@ -1,0 +1,18 @@
+{
+  "name": "@workspace/lead-monitor",
+  "version": "2.0.0",
+  "description": "Reddit Lead Intelligence Platform — standalone Node.js + Express, no build step",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev":   "BASE_PATH=/monitor PORT=3001 node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.10.0",
+    "express": "^5.2.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}

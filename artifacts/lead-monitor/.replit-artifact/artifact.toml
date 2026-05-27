@@ -1,0 +1,28 @@
+kind = "api"
+previewPath = "/monitor"
+title = "Reddit Lead Intel"
+version = "2.0.0"
+id = "lead-monitor-standalone"
+
+[[services]]
+localPort = 3001
+name = "Reddit Lead Intel"
+paths = ["/monitor"]
+
+[services.development]
+run = "BASE_PATH=/monitor node server.js"
+
+[services.production]
+
+[services.production.build]
+args = ["echo", "no-build-step"]
+
+[services.production.run]
+args = ["node", "server.js"]
+
+[services.production.run.env]
+PORT = "3001"
+BASE_PATH = "/monitor"
+
+[services.production.health.startup]
+path = "/monitor/api/status"
