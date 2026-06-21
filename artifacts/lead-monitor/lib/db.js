@@ -17,7 +17,7 @@
 const Database = require('better-sqlite3');
 const path     = require('path');
 
-const DB_PATH = path.join(__dirname, '..', 'lead_monitor.db');
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', 'lead_monitor.db');
 
 let _db = null;
 
