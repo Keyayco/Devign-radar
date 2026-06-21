@@ -1,0 +1,17 @@
+node_modules/
+*.db
+*.db-shm
+*.db-wal
+logs/
+.env
+monitor_config.json
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# Old Flask app (do not upload these)
+monitor_app.py
+static/
+dashboard.html
+
