@@ -16,11 +16,12 @@ RUN pip3 install --no-cache-dir -r requirements.txt --break-system-packages
 
 COPY . .
 
-RUN mkdir -p /data
+# DB lives inside the container — persists across restarts, resets only on new deploys
+RUN mkdir -p /app/data
 
 ENV PORT=3001
 ENV BASE_PATH=""
-ENV DB_PATH=/data/lead_monitor.db
+ENV DB_PATH=/app/data/lead_monitor.db
 ENV NODE_ENV=production
 
 EXPOSE 3001
