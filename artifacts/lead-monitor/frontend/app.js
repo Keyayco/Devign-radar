@@ -111,12 +111,13 @@ function logClass(line) {
 }
 
 function appendLog(line) {
+  if (line == null || line === '') return;   // guard: never show "undefined"
   const box = $('log-box');
   if (firstLog) { box.innerHTML = ''; firstLog = false; }
 
   const div = document.createElement('div');
   div.className = 'log-line ' + logClass(line);
-  div.textContent = line;
+  div.textContent = String(line);
   box.appendChild(div);
 
   // Cap DOM at 800 lines for performance
