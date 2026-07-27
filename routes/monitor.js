@@ -66,15 +66,25 @@ const DEFAULT_CONFIG = {
 };
 
 function loadConfig() {
-  try {
-    return { ...DEFAULT_CONFIG, ...JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')) };
-  } catch {
-    return { ...DEFAULT_CONFIG };
-  }
+  let file = {};
+  try { file = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch {}
+  return {
+    ...DEFAULT_CONFIG,
+    ...file,
+    // Env vars take priority — set TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID in Railway
+    bot_token: process.env.TELEGRAM_BOT_TOKEN || file.bot_token || '',
+    chat_id:   process.env.TELEGRAM_CHAT_ID   || file.chat_id   || '',
+  };
 }
 
 function persistConfig(cfg) {
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2));
+  try {
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2));
+    return true;
+  } catch (e) {
+    console.error('[CONFIG] write failed:', e.message);
+    return false;
+  }
 }
 
 // ── SSE ─────────────────────────────────────────────────────────────────────
@@ -119,7 +129,9 @@ router.get('/config', (req, res) => {
   const c = loadConfig();
   res.json({
     token_configured:   !!(c.bot_token && c.bot_token.length > 5),
+    token_from_env:     !!(process.env.TELEGRAM_BOT_TOKEN),
     chat_id_configured: !!(c.chat_id   && c.chat_id.length   > 2),
+    chat_id_from_env:   !!(process.env.TELEGRAM_CHAT_ID),
     chat_id_display:    c.chat_id ? c.chat_id.slice(0, 5) + '…' : '',
     interval:           c.interval,
     feeds:              c.feeds,
@@ -131,13 +143,17 @@ router.get('/config', (req, res) => {
 router.post('/config', (req, res) => {
   const b   = req.body || {};
   const cur = loadConfig();
-  persistConfig({
-    bot_token: b.bot_token?.trim() || cur.bot_token,
-    chat_id:   b.chat_id?.trim()   || cur.chat_id,
+  // If token/chatid are set via env vars, don't overwrite them in the file
+  const saved = persistConfig({
+    bot_token: b.bot_token?.trim() || (process.env.TELEGRAM_BOT_TOKEN ? '' : cur.bot_token),
+    chat_id:   b.chat_id?.trim()   || (process.env.TELEGRAM_CHAT_ID   ? '' : cur.chat_id),
     interval:  b.interval ? Math.max(30, Number(b.interval)) : cur.interval,
     feeds:     Array.isArray(b.feeds)    ? b.feeds.filter(Boolean)    : cur.feeds,
     keywords:  Array.isArray(b.keywords) ? b.keywords.filter(Boolean) : cur.keywords,
   });
+  if (!saved) {
+    return res.status(500).json({ ok: false, error: 'Could not write config file — use Railway env vars instead' });
+  }
   res.json({ ok: true });
 });
 
@@ -162,4 +178,3 @@ router.patch('/leads/:id', (req, res) => {
 });
 
 module.exports = router;
-
