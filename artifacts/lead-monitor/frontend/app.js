@@ -52,10 +52,10 @@ function connectSSE() {
     // EventSource auto-reconnects — no manual retry needed
   };
 
-  es.addEventListener('log',    e => appendLog(JSON.parse(e.data).line));
-  es.addEventListener('lead',   e => onNewLead(JSON.parse(e.data)));
-  es.addEventListener('stats',  e => onStats(JSON.parse(e.data)));
-  es.addEventListener('status', e => onStatus(JSON.parse(e.data).running));
+  es.addEventListener('log',    e => { try { appendLog(JSON.parse(e.data).line); } catch {} });
+  es.addEventListener('lead',   e => { try { onNewLead(JSON.parse(e.data)); } catch {} });
+  es.addEventListener('stats',  e => { try { onStats(JSON.parse(e.data)); } catch {} });
+  es.addEventListener('status', e => { try { onStatus(JSON.parse(e.data).running); } catch {} });
 }
 
 // ── Status / UI ──────────────────────────────────────────────────────────────
