@@ -137,9 +137,13 @@ async function startMonitor() {
     if (!d.ok) {
       showToast(d.msg || 'Start failed');
       $('btn-start').disabled = false;
+    } else {
+      // SSE may be slow to deliver the status update — poll as fallback
+      setTimeout(loadDbStats, 1500);
+      setTimeout(loadDbStats, 4000);
     }
   } catch (e) {
-    showToast('Network error');
+    showToast('Network error — is the server running?');
     $('btn-start').disabled = false;
   }
 }
@@ -330,14 +334,18 @@ async function loadConfig() {
     const d = await r.json();
 
     const tokenEl = $('token-status');
-    if (d.token_configured) {
+    if (d.token_from_env) {
+      tokenEl.textContent = '● Set via Railway env var'; tokenEl.className = 'cfg-status cfg-yes';
+    } else if (d.token_configured) {
       tokenEl.textContent = '● Configured'; tokenEl.className = 'cfg-status cfg-yes';
     } else {
       tokenEl.textContent = '○ Not configured'; tokenEl.className = 'cfg-status cfg-no';
     }
 
     const chatEl = $('chatid-status');
-    if (d.chat_id_configured) {
+    if (d.chat_id_from_env) {
+      chatEl.textContent = '● Set via Railway env var'; chatEl.className = 'cfg-status cfg-yes';
+    } else if (d.chat_id_configured) {
       chatEl.textContent = '● Configured'; chatEl.className = 'cfg-status cfg-yes';
       $('cfg-chatid').placeholder = d.chat_id_display || 'configured';
     } else {
@@ -374,9 +382,15 @@ async function saveConfig() {
       msg.classList.add('show');
       setTimeout(() => msg.classList.remove('show'), 2500);
       await loadConfig();
+    } else {
+      // File write failed — show the server's error message
+      showToast(d.error || 'Save failed — use Railway env vars for token/chat ID');
     }
   } catch { showToast('Save failed — check network'); }
 }
+
+// ── Polling fallback (keeps UI in sync even if SSE is blocked by proxy) ──────
+setInterval(loadDbStats, 15_000);
 
 // ── Page bootstrap ────────────────────────────────────────────────────────────
 async function init() {

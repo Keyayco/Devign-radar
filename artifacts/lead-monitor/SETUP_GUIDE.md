@@ -3,251 +3,199 @@
 
 ---
 
-## What You're Building
-
-A private web app that watches Reddit 24/7 for people asking to hire a web developer or designer. Every match is saved to a database, scored by buying intent, and shown in a live dashboard you can check from any browser. Optional Telegram alerts ping you the moment a high-value lead appears.
-
----
-
 ## What You Need (all free)
 
-| Account | What it's for | Link |
-|---------|--------------|------|
-| **GitHub** | Stores your code | github.com |
-| **Railway** | Hosts the app (server) | railway.app |
-| **Telegram** *(optional)* | Instant lead alerts | telegram.org |
+| Tool | What it's for | Sign up at |
+|------|---------------|------------|
+| GitHub account | Stores your files | github.com |
+| Railway account | Runs the app 24/7 | railway.app |
+| Telegram account | Receives lead alerts | Already have it |
 
 ---
 
-## Recommended Server: Railway
+## Part 1 — Create Your GitHub Repository
 
-**Why Railway?**
-- Zero command-line — everything through a website
-- Connects to GitHub and auto-redeploys when you edit a file
-- $5 free credit every month (this app uses ~$0.50–$1.50/month)
-- No volumes or databases to configure — the app stores everything internally
+### Step 1 — Sign into GitHub
+1. Open **github.com** in Chrome on your Samsung
+2. Tap **Sign in** (or Sign up if you don't have an account)
 
----
+### Step 2 — Create a new repository
+1. Tap the **+** button (top right) → **New repository**
+2. Repository name: `reddit-lead-intel`
+3. Set it to **Private**
+4. **Do NOT** check "Add a README file"
+5. Tap **Create repository**
 
-## File Structure
+### Step 3 — Add your files
 
-Your GitHub repo must contain **exactly these files** — nothing else:
+You need to create these files. For each one:
+1. On the repository page, tap **creating a new file**
+2. Type the filename exactly as shown
+3. Paste the content from your Replit project
+4. Tap **Commit new file**
+
+**Files to upload (all inside `artifacts/lead-monitor/` in your Replit project):**
 
 ```
-reddit-lead-intel/
-│
-├── server.js
-├── worker.py
-├── package.json
-├── requirements.txt
-├── Dockerfile
-├── railway.toml          ← tells Railway exactly how to build
-├── .dockerignore
-├── .gitignore
-├── .env.example
-├── README.md
-│
-├── lib/
-│   ├── db.js
-│   └── worker-manager.js
-│
-├── routes/
-│   └── monitor.js
-│
-└── frontend/
-    ├── dashboard.html
-    ├── styles.css
-    └── app.js
+Dockerfile
+railway.toml
+.gitignore
+.dockerignore
+package.json
+server.js
+worker.py
+requirements.txt
+routes/monitor.js          ← create the routes/ folder by typing "routes/monitor.js" as the filename
+lib/db.js                  ← create the lib/ folder by typing "lib/db.js"
+lib/worker-manager.js
+frontend/dashboard.html    ← create the frontend/ folder
+frontend/app.js
+frontend/styles.css
 ```
 
-**Do NOT upload:** anything from outside the `artifacts/lead-monitor/` folder in this Replit project.  
-Specifically do NOT upload: `monitor_app.py`, `static/`, the `dashboard.html` at the root level, `node_modules/`, `*.db` files, `monitor_config.json`.
+> **Tip:** To create a file inside a folder, type the folder name, then `/`, then the filename.
+> Example: type `routes/monitor.js` to create the routes folder automatically.
 
 ---
 
-## ⚠️ Important: Use a Fresh GitHub Repo
+## Part 2 — Set Up Telegram Bot
 
-**The build error `pnpm: not found` happens when Railway is connected to the full Replit project repo** (which has a pnpm monorepo at the root). You need a **brand new, separate GitHub repo** containing only the 15 files listed above.
+### Step 1 — Create a bot
+1. Open Telegram → search for **@BotFather**
+2. Send: `/newbot`
+3. Choose a name (e.g. "My Lead Monitor")
+4. Choose a username ending in `bot` (e.g. `myleadmon_bot`)
+5. BotFather gives you a **token** — save it (looks like `7123456789:AAFxxx...`)
 
----
-
-## Step 1 — Create a GitHub Account
-
-1. Open **Chrome** on your Samsung
-2. Go to **github.com**
-3. Tap **Sign up** → fill in email, password, username
-4. Verify your email → sign in
-
----
-
-## Step 2 — Create a New Repository
-
-1. Tap the **+** icon (top-right) → **New repository**
-2. Fill in:
-   - **Repository name:** `reddit-lead-intel`
-   - **Visibility:** ☑ Private
-   - ☑ Add a README file
-3. Tap **Create repository**
+### Step 2 — Get your Chat ID
+1. Search for **@userinfobot** in Telegram
+2. Send it any message
+3. It replies with your **Chat ID** — save it (a number like `123456789`)
 
 ---
 
-## Step 3 — Upload the Files
+## Part 3 — Deploy on Railway
 
-### Easiest method on Samsung (paste directly):
+### Step 1 — Connect Railway to GitHub
+1. Go to **railway.app** and sign in with your GitHub account
+2. Tap **New Project** → **Deploy from GitHub repo**
+3. Select your `reddit-lead-intel` repository
+4. Railway automatically detects the Dockerfile and starts building
 
-1. In your new repo, tap **Add file** → **Create new file**
-2. In the **name box at the top**, type the filename (e.g. `server.js`)
-   - For files inside folders, type the full path: `lib/db.js` (GitHub creates the folder)
-3. Open this Replit project, open the matching file, **select all → copy**
-4. Paste into the GitHub text box
-5. Scroll down → tap **Commit new file**
-6. Repeat for each file
+### Step 2 — Set Environment Variables ⚠️ MOST IMPORTANT STEP
 
-### Files to create (do them in this order):
+> **Why this matters:** Railway resets the filesystem on every deploy. If you enter your bot token through the app's Config tab, it gets wiped when you redeploy. Setting them as Railway variables means they survive forever.
 
-| File | Where to find it in Replit |
-|------|---------------------------|
-| `Dockerfile` | `artifacts/lead-monitor/Dockerfile` |
-| `railway.toml` | `artifacts/lead-monitor/railway.toml` |
-| `.gitignore` | `artifacts/lead-monitor/.gitignore` |
-| `.dockerignore` | `artifacts/lead-monitor/.dockerignore` |
-| `.env.example` | `artifacts/lead-monitor/.env.example` |
-| `package.json` | `artifacts/lead-monitor/package.json` |
-| `requirements.txt` | `artifacts/lead-monitor/requirements.txt` |
-| `server.js` | `artifacts/lead-monitor/server.js` |
-| `worker.py` | `artifacts/lead-monitor/worker.py` |
-| `README.md` | `artifacts/lead-monitor/README.md` |
-| `lib/db.js` | `artifacts/lead-monitor/lib/db.js` |
-| `lib/worker-manager.js` | `artifacts/lead-monitor/lib/worker-manager.js` |
-| `routes/monitor.js` | `artifacts/lead-monitor/routes/monitor.js` |
-| `frontend/dashboard.html` | `artifacts/lead-monitor/frontend/dashboard.html` |
-| `frontend/styles.css` | `artifacts/lead-monitor/frontend/styles.css` |
-| `frontend/app.js` | `artifacts/lead-monitor/frontend/app.js` |
+1. In your Railway project, click your service
+2. Go to the **Variables** tab
+3. Add these variables one by one (tap **New Variable** each time):
 
-> **Tip:** You can leave the auto-generated README.md from Step 2 and just overwrite it by tapping the pencil icon on it.
+| Variable Name | Value | Required? |
+|---------------|-------|-----------|
+| `TELEGRAM_BOT_TOKEN` | Your token from BotFather | Yes (for alerts) |
+| `TELEGRAM_CHAT_ID` | Your Chat ID number | Yes (for alerts) |
+| `PORT` | `3000` | Yes |
+
+> **Do NOT set BASE_PATH** — leave it blank/unset for Railway.
+
+4. Click **Deploy** after adding variables (Railway redeploys automatically)
+
+### Step 3 — Get Your App URL
+1. In Railway, click your service → **Settings** tab
+2. Under **Networking**, tap **Generate Domain**
+3. Railway gives you a URL like `https://reddit-lead-intel-production.up.railway.app`
+4. Open that URL — you should see the dashboard
 
 ---
 
-## Step 4 — (Optional) Set Up Telegram Alerts
+## Part 4 — Start Monitoring
 
-### Create a bot:
-1. Open Telegram → search **@BotFather**
-2. Send `/newbot` → follow the prompts
-3. Copy the **token** BotFather gives you (looks like `123456789:ABCdef...`)
+1. Open your Railway app URL
+2. Go to the **Config** tab
+3. You should see **"● Set via Railway env var"** next to both Bot Token and Chat ID
+   - If it still says "Not configured", double-check the variable names in Railway are exactly `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`
+4. The feeds and keywords are pre-filled with good defaults — adjust if you want
+5. Tap **Save Config** (for feeds/keywords only — token/chat ID are handled by env vars)
+6. Go to the **Monitor** tab
+7. Tap **▶ Start Monitor**
 
-### Get your Chat ID:
-1. Send any message to your new bot (e.g. "hello")
-2. In Chrome, open: `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates`
-3. Find `"chat":{"id":` — the number after it is your **Chat ID**
+Within a minute you'll see log lines like:
+```
+[SYSTEM] Spawning worker (0 known IDs seeded)
+[SYSTEM] Worker started — 5 feed(s), 20 keyword(s)
+[FEED] r/Entrepreneur — 25 posts
+[FEED] r/forhire — 12 posts
+```
 
----
-
-## Step 5 — Sign Up for Railway
-
-1. Go to **railway.app**
-2. Tap **Login** → **Login with GitHub** → authorize
-
----
-
-## Step 6 — Deploy on Railway
-
-1. On the Railway dashboard, tap **New Project**
-2. Tap **Deploy from GitHub repo**
-3. Tap **Configure GitHub App** if prompted → authorize → select `reddit-lead-intel`
-4. Railway detects the `Dockerfile` and `railway.toml` and starts building automatically
-
-> If you see a build log, that's normal. It takes 2–4 minutes the first time.
-
-### Add Environment Variables:
-
-Once deployed, tap on your service → **Variables** tab → **New Variable** for each:
-
-| Variable | Value |
-|----------|-------|
-| `PORT` | `3001` |
-| `NODE_ENV` | `production` |
-| `BASE_PATH` | *(leave empty — no value)* |
-| `BOT_TOKEN` | your Telegram bot token *(only if using Telegram)* |
-| `CHAT_ID` | your Telegram chat ID *(only if using Telegram)* |
-
-> **Note:** You do NOT need to add `DB_PATH` — the default value in the Dockerfile already handles this correctly.
-
-After saving variables, Railway will redeploy automatically (1–2 minutes).
-
-### Get your live URL:
-
-Tap your service → **Settings** tab → **Networking** → **Generate Domain**
-
-You'll get a URL like `reddit-lead-intel-production.up.railway.app` — that's your app.
-
----
-
-## Step 7 — Configure & Start
-
-1. Open your Railway URL in Chrome
-2. Tap the **Config** tab → enter your keywords, subreddits, scan interval
-3. If you set up Telegram, enter your token and chat ID here too
-4. Tap **Save Config**
-5. Tap the **Monitor** tab → tap **▶ Start Monitor**
-
-The live log starts filling in. First leads appear within a few minutes.
-
----
-
-## About Data Persistence
-
-Your leads database is stored inside the server container at `/app/data/lead_monitor.db`.
-
-- **App restarts** (crash recovery, manual restart) → ✅ data is kept
-- **New deploys** (when you edit a file on GitHub) → ⚠️ data resets
-
-For most users this is fine — you'll only push a code change every few weeks. If you want permanent persistence across deploys, Railway does support adding a Volume through their web UI (Settings → Volumes → Add Volume, mount path `/app/data`), but it's not required to get started.
+When a lead is found, you get a Telegram message within seconds.
 
 ---
 
 ## Troubleshooting
 
-### Build fails with `pnpm: not found`
-You've connected Railway to the wrong repository — probably the full Replit project instead of your new standalone `reddit-lead-intel` repo. Fix:
-- Go to Railway → service → Settings → **Source** → change the repo to `reddit-lead-intel`
-- Or delete the project and start Step 6 again, making sure to select the correct repo
+### "Not configured" still showing after setting Railway env vars
+- Check the variable names are spelled exactly: `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`
+- Make sure you clicked **Deploy** (or Railway auto-redeployed) after adding the variables
+- Refresh the app page and check the Config tab again
 
-### Build fails with `npm ERR!` or module errors
-One of the files might be missing or have a typo in the filename. Check GitHub that all 16 files are present.
+### Start button stays grayed out / nothing happens
+- The app updates every 15 seconds even without a live connection
+- Wait 15 seconds and the status should update
+- If nothing happens after 30 seconds, check Railway's **Deployment Logs** for errors
 
-### App builds but URL shows an error
-- Tap the **Deployments** tab → tap the latest → **View Logs**
-- Check that `PORT=3001` is set in Variables
+### "Save failed — use Railway env vars for token/chat ID"
+- This means the server couldn't write to disk (a Railway filesystem quirk)
+- This is expected — just use Railway env vars for the token/chat ID as described above
+- You CAN still save feeds and keywords through the Config tab
 
-### No leads appearing after starting
-- The live log will show connection attempts — watch for any `ERROR` lines
-- Reddit RSS can be slow: wait 5–10 minutes for the first full scan cycle
-- Check the **Config** tab — make sure your keyword list isn't empty
+### App won't load / 502 error
+1. Go to Railway → your service → **Deployments**
+2. Click the latest deployment → **View Logs**
+3. Look for red error lines
 
-### Telegram alerts not arriving
-- Double-check token and chat ID in the Config tab
-- Make sure you sent at least one message to your bot first
+### No Telegram alerts
+1. Double-check `TELEGRAM_BOT_TOKEN` is correct (copy from BotFather message)
+2. Double-check `TELEGRAM_CHAT_ID` is your number (from @userinfobot)
+3. Make sure you've sent at least one message to your bot first
+4. Check the Monitor tab log for `[TELEGRAM]` lines
+
+### High/Medium leads found but no alert
+- The monitor only alerts for score ≥ 45 (MEDIUM or HIGH intent)
+- Check the Leads tab to see what was found and its score
 
 ---
 
-## Cost Summary
+## File Structure (what goes in GitHub)
 
-| Service | Cost |
-|---------|------|
-| GitHub | Free |
-| Railway | $5 free credit/month |
-| **Total** | **$0/month** |
+```
+reddit-lead-intel/          ← your GitHub repository root
+├── Dockerfile              ← tells Railway how to build
+├── railway.toml            ← tells Railway to use the Dockerfile
+├── .gitignore
+├── .dockerignore
+├── package.json
+├── server.js               ← Node.js web server
+├── worker.py               ← Python Reddit scanner
+├── requirements.txt        ← Python packages
+├── routes/
+│   └── monitor.js          ← API endpoints
+├── lib/
+│   ├── db.js               ← SQLite database
+│   └── worker-manager.js   ← manages Python process
+└── frontend/
+    ├── dashboard.html      ← the web UI
+    ├── app.js              ← dashboard JavaScript
+    └── styles.css          ← dashboard styles
+```
 
 ---
 
 ## Quick Reference
 
-| Task | Where |
-|------|-------|
-| View dashboard | Your Railway URL |
-| Start/stop monitor | Monitor tab |
-| See captured leads | Leads tab |
-| Change keywords | Config tab |
-| Update code | Edit file on GitHub → auto-redeploys |
-| View server logs | Railway → Deployments → View Logs |
-| Restart server | Railway → service → Restart |
+| Task | How |
+|------|-----|
+| Check logs | Railway → Deployments → View Logs |
+| Restart server | Railway → service → Redeploy |
+| Change keywords | Config tab → Keywords → Save Config |
+| Add a subreddit | Config tab → Feeds → add line → Save Config |
+| Stop scanning | Monitor tab → ■ Stop |

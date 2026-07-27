@@ -19,12 +19,16 @@ COPY . .
 # DB lives inside the container — persists across restarts, resets only on new deploys
 RUN mkdir -p /app/data
 
-ENV PORT=3001
+# Railway injects PORT automatically — override here only if needed
+ENV PORT=3000
 ENV BASE_PATH=""
 ENV DB_PATH=/app/data/lead_monitor.db
 ENV NODE_ENV=production
+# Set these in Railway's Variables tab — they survive redeploys
+ENV TELEGRAM_BOT_TOKEN=""
+ENV TELEGRAM_CHAT_ID=""
 
-EXPOSE 3001
+EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:'+process.env.PORT+'/health', r => process.exit(r.statusCode===200?0:1))"
