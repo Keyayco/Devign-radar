@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY package.json ./
+COPY artifacts/lead-monitor/package.json ./
 RUN npm install --omit=dev
 
 COPY requirements.txt ./
