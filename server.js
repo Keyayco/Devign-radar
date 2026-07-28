@@ -35,6 +35,7 @@ function serveDashboard(req, res) {
     const html   = fs.readFileSync(DASHBOARD, 'utf8');
     const inject = `<script>window.API_BASE=${JSON.stringify(BASE + '/api')};</script>`;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
     res.send(html.replace('</head>', inject + '\n</head>'));
   } catch {
     res.status(500).send('Dashboard not found. Check frontend/dashboard.html exists.');
