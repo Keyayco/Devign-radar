@@ -512,10 +512,11 @@ function connectSSE() {
 // ── Log panel ──────────────────────────────────────────────────────────────
 let firstLog = true;
 function appendLog(line) {
+  if (line == null || line === '') return;
   if (firstLog) { logBox.innerHTML = ""; firstLog = false; }
   const div = document.createElement("div");
   div.className = "log-line " + logClass(line);
-  div.textContent = line;
+  div.textContent = String(line);
   logBox.appendChild(div);
   // Cap at 600 visible lines to keep DOM light
   while (logBox.children.length > 600) logBox.removeChild(logBox.firstChild);
@@ -546,7 +547,16 @@ async function startMonitor() {
     const r = await fetch(BASE + "/start", { method: "POST" });
     const d = await r.json();
     if (!d.ok) { alert(d.msg); btnStart.disabled = false; }
-  } catch(e) { alert("Error: " + e); btnStart.disabled = false; }
+    else {
+      // SSE may be slow on Railway's proxy — poll as fallback
+      setTimeout(async () => {
+        try { const s = await (await fetch(BASE + "/status")).json(); if (s.running != null) { isRunning = s.running; updateUI(); } } catch {}
+      }, 1500);
+      setTimeout(async () => {
+        try { const s = await (await fetch(BASE + "/status")).json(); if (s.running != null) { isRunning = s.running; updateUI(); } } catch {}
+      }, 4000);
+    }
+  } catch(e) { alert("Network error — is the server running?"); btnStart.disabled = false; }
 }
 
 async function stopMonitor() {
@@ -629,14 +639,18 @@ async function loadConfig() {
     const data = await r.json();
     // Token: never shown — only show configured status
     const tokenEl = document.getElementById("token-status");
-    if (data.token_configured) {
+    if (data.token_from_env) {
+      tokenEl.textContent = "● Set via Railway env var"; tokenEl.className = "configured yes";
+    } else if (data.token_configured) {
       tokenEl.textContent = "● Configured"; tokenEl.className = "configured yes";
     } else {
       tokenEl.textContent = "○ Not configured"; tokenEl.className = "configured no";
     }
     // Chat ID: show partially masked display, but also put full value in field for editing
     const chatEl = document.getElementById("chatid-status");
-    if (data.chat_id_configured) {
+    if (data.chat_id_from_env) {
+      chatEl.textContent = "● Set via Railway env var"; chatEl.className = "configured yes";
+    } else if (data.chat_id_configured) {
       chatEl.textContent = "● Configured"; chatEl.className = "configured yes";
       document.getElementById("cfg-chatid").placeholder = data.chat_id_display || "configured";
     } else {
