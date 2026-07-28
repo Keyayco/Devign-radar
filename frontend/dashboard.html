@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reddit Lead Intelligence</title>
+  <style>
+    /* ── Reset ─────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #0f1117;
+      --surface:  #1a1d27;
+      --border:   #2d3148;
+      --border2:  #1e2235;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --muted2:   #475569;
+      --indigo:   #4f46e5;
+      --indigo-d: #4338ca;
+      --green:    #4ade80;
+      --orange:   #fb923c;
+      --red:      #f87171;
+      --blue:     #38bdf8;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+           background: var(--bg); color: var(--text); min-height: 100vh; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    button { cursor: pointer; font-family: inherit; }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0 20px; height: 52px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .logo { font-size: 1rem; font-weight: 800; color: #fff; white-space: nowrap; }
+    .logo span { color: var(--indigo); }
+    .sub { font-size: 0.72rem; color: var(--muted); display: none; }
+    @media (min-width: 480px) { .sub { display: block; } }
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 99px;
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+    }
+    .badge.stopped { background: #1e293b; color: var(--muted); }
+    .badge.running { background: #052e16; color: var(--green); }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .badge.running .dot { animation: blink 1.2s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+    .sse-indicator {
+      margin-left: auto; display: flex; align-items: center; gap: 5px;
+      font-size: 0.68rem; color: var(--muted); white-space: nowrap;
+    }
+    .sse-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+    .sse-dot.connected { background: var(--green); }
+
+    /* ── Tab bar ────────────────────────────────────────────────────────── */
+    .tabbar {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      display: flex; gap: 0; overflow-x: auto;
+    }
+    .tab-btn {
+      padding: 12px 20px; border: none; background: transparent;
+      color: var(--muted); font-size: 0.83rem; font-weight: 600;
+      border-bottom: 2px solid transparent; white-space: nowrap;
+      transition: color .15s, border-color .15s;
+    }
+    .tab-btn.active { color: var(--text); border-bottom-color: var(--indigo); }
+    .tab-btn:hover:not(.active) { color: var(--text); }
+    .tab-count {
+      display: inline-block; background: var(--indigo); color: #fff;
+      font-size: 0.65rem; font-weight: 700; padding: 1px 6px;
+      border-radius: 99px; margin-left: 5px; vertical-align: middle;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────────────── */
+    main { max-width: 1000px; margin: 0 auto; padding: 20px 16px 80px; }
+    .tab-panel { display: none; flex-direction: column; gap: 18px; }
+    .tab-panel.active { display: flex; }
+
+    /* ── Cards ──────────────────────────────────────────────────────────── */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+    .card-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 14px; }
+    .card-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+
+    /* ── Stats ──────────────────────────────────────────────────────────── */
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .stat { background: #12141e; border: 1px solid var(--border); border-radius: 8px; padding: 14px 10px; text-align: center; }
+    .stat-num { font-size: 1.8rem; font-weight: 800; color: var(--indigo); line-height: 1; }
+    .stat-lbl { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
+
+    /* ── Controls ───────────────────────────────────────────────────────── */
+    .btn { padding: 9px 18px; border: none; border-radius: 7px; font-size: 0.83rem; font-weight: 600; transition: opacity .15s, transform .1s; }
+    .btn:active { transform: scale(.96); }
+    .btn:disabled { opacity: .35; cursor: default; }
+    .btn-start { background: var(--indigo); color: #fff; }
+    .btn-start:hover:not(:disabled) { background: var(--indigo-d); }
+    .btn-stop  { background: #7f1d1d; color: #fca5a5; }
+    .btn-stop:hover:not(:disabled)  { background: #991b1b; }
+    .btn-save  { background: #14532d; color: #86efac; }
+    .btn-save:hover { background: #166534; }
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    /* ── Architecture diagram ────────────────────────────────────────────── */
+    .arch { background: #0a0c14; border: 1px solid var(--border2); border-radius: 8px; padding: 14px 16px; font-family: "SF Mono","Fira Code",monospace; font-size: 0.74rem; color: var(--muted); line-height: 1.9; }
+    .arch .hl { color: #818cf8; }
+    .arch .hl2 { color: var(--green); }
+    .arch .hl3 { color: var(--orange); }
+
+    /* ── Log box ────────────────────────────────────────────────────────── */
+    .log-wrap { position: relative; }
+    #log-box {
+      background: #0a0c14; border: 1px solid var(--border2); border-radius: 8px;
+      height: 320px; overflow-y: auto; padding: 12px 14px;
+      font-family: "SF Mono","Fira Code",monospace; font-size: 0.76rem; line-height: 1.65;
+    }
+    .log-line { color: #94a3b8; word-break: break-all; }
+    .log-line.FEED     { color: var(--blue); }
+    .log-line.MATCH    { color: var(--orange); font-weight: 600; }
+    .log-line.TELEGRAM { color: var(--green); }
+    .log-line.ERROR    { color: var(--red); }
+    .log-line.WARN     { color: #fbbf24; }
+    .log-line.SYSTEM   { color: #a78bfa; }
+    .log-line.DB       { color: #34d399; }
+    .log-placeholder   { color: var(--muted2); font-style: italic; }
+    .log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    label.as-label { font-size: 0.75rem; color: var(--muted); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+
+    /* ── Filter pills ───────────────────────────────────────────────────── */
+    .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .filter-pill {
+      padding: 5px 14px; border-radius: 99px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted); font-size: 0.78rem; font-weight: 600;
+      transition: all .15s; white-space: nowrap;
+    }
+    .filter-pill.active        { border-color: var(--indigo); background: #1e1b4b; color: #a5b4fc; }
+    .filter-pill.f-high.active  { border-color: #166534; background: #052e16; color: var(--green); }
+    .filter-pill.f-medium.active{ border-color: #9a3412; background: #1c0f02; color: var(--orange); }
+    .filter-pill.f-low.active   { border-color: var(--muted2); background: #1e293b; color: var(--muted); }
+
+    /* ── Leads table ────────────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 620px; }
+    thead th {
+      text-align: left; padding: 9px 10px;
+      background: #12141e; color: var(--muted);
+      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid var(--border2); transition: background .12s; }
+    tbody tr:hover { background: #12141e; }
+    td { padding: 9px 10px; vertical-align: middle; }
+    .empty-msg { text-align: center; color: var(--muted2); padding: 32px !important; font-style: italic; }
+
+    /* Score cell */
+    .score-wrap { display: flex; align-items: center; gap: 7px; }
+    .score-bar  { width: 36px; height: 4px; background: #1e293b; border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+    .score-fill { height: 100%; border-radius: 2px; transition: width .3s; }
+    .score-fill.high   { background: var(--green); }
+    .score-fill.medium { background: var(--orange); }
+    .score-fill.low    { background: var(--muted2); }
+    .score-num  { font-size: 0.8rem; font-weight: 700; min-width: 22px; }
+
+    /* Intent badge */
+    .intent-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    .intent-high   { background: #052e16; color: var(--green);  border: 1px solid #166534; }
+    .intent-medium { background: #1c0f02; color: var(--orange); border: 1px solid #9a3412; }
+    .intent-low    { background: #1e293b; color: var(--muted);  border: 1px solid #334155; }
+
+    /* Title cell */
+    .title-cell { max-width: 240px; }
+    .title-cell a { color: var(--text); font-weight: 500; }
+    .title-cell a:hover { color: var(--blue); }
+    .title-text { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+    /* Keyword chip */
+    .kw-chip { background: #1e1b4b; color: #a5b4fc; padding: 2px 7px; border-radius: 4px; font-size: 0.7rem; white-space: nowrap; }
+
+    /* Date */
+    .date-cell { color: var(--muted); font-size: 0.74rem; white-space: nowrap; }
+
+    /* Status select */
+    .status-sel {
+      background: #0a0c14; border: 1px solid var(--border); border-radius: 5px;
+      padding: 4px 7px; font-size: 0.74rem; font-family: inherit;
+      transition: border-color .15s; outline: none; width: 100%; color: var(--text);
+    }
+    .status-sel:focus { border-color: var(--indigo); }
+    .status-sel.s-new       { color: #818cf8; }
+    .status-sel.s-contacted { color: var(--blue); }
+    .status-sel.s-ignored   { color: var(--muted); }
+    .status-sel.s-won       { color: var(--green); }
+
+    /* ── Config form ────────────────────────────────────────────────────── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 560px) { .form-grid { grid-template-columns: 1fr; } }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field.full { grid-column: 1 / -1; }
+    .field label { font-size: 0.74rem; color: var(--muted); }
+    .field input, .field textarea {
+      background: #0a0c14; border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); padding: 9px 11px; font-size: 0.82rem; font-family: inherit;
+      transition: border-color .15s; outline: none; width: 100%;
+    }
+    .field input:focus, .field textarea:focus { border-color: var(--indigo); }
+    .field textarea { resize: vertical; min-height: 100px; line-height: 1.5; }
+    .field .hint  { font-size: 0.68rem; color: var(--muted2); }
+    .field .configured { font-size: 0.74rem; font-weight: 600; }
+    .field .configured.yes { color: var(--green); }
+    .field .configured.no  { color: var(--red); }
+    .save-row { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+    .save-msg { font-size: 0.78rem; color: var(--green); opacity: 0; transition: opacity .3s; }
+
+    /* ── Misc ────────────────────────────────────────────────────────────── */
+    .section-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">Reddit <span>Lead</span> Intel</div>
+  <span class="sub">Express → Python</span>
+  <span class="badge stopped" id="status-badge"><span class="dot"></span><span id="status-text">Stopped</span></span>
+  <div class="sse-indicator">
+    <div class="sse-dot" id="sse-dot"></div>
+    <span id="sse-label">SSE</span>
+  </div>
+</header>
+
+<!-- ── Tab bar ─────────────────────────────────────────────────────────── -->
+<div class="tabbar">
+  <button class="tab-btn active" data-tab="monitor">Monitor</button>
+  <button class="tab-btn"        data-tab="leads">
+    Leads <span class="tab-count" id="leads-count">0</span>
+  </button>
+  <button class="tab-btn" data-tab="config">Config</button>
+</div>
+
+<main>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       TAB: MONITOR
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="tab-panel active" id="tab-monitor">
+
+    <!-- Stats -->
+    <div class="card">
+      <div class="card-title">Session Stats</div>
+      <div class="stats-grid">
+        <div class="stat"><div class="stat-num" id="stat-cycles">0</div><div class="stat-lbl">Cycles</div></div>
+        <div class="stat"><div class="stat-num" id="stat-matches">0</div><div class="stat-lbl">Leads Found</div></div>
+        <div class="stat"><div class="stat-num" id="stat-alerts">0</div><div class="stat-lbl">Alerts Sent</div></div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="card">
+      <div class="card-title">Controls</div>
+      <div class="btn-row">
+        <button class="btn btn-start" id="btn-start" onclick="startMonitor()">▶ Start Monitor</button>
+        <button class="btn btn-stop"  id="btn-stop"  onclick="stopMonitor()" disabled>■ Stop</button>
+      </div>
+    </div>
+
+    <!-- Architecture -->
+    <div class="card">
+      <div class="card-title">How It Works</div>
+      <div class="arch">
+        <span class="hl">Browser (HTML/CSS/JS)</span>
+          <span style="color:#4b5563">─── EventSource SSE ──▶</span>
+        <span class="hl">Express (Node.js)</span>
+          <span style="color:#4b5563">─── spawn() ──▶</span>
+        <span class="hl2">Python Worker</span><br>
+        <span class="hl2">Python</span>
+          <span style="color:#4b5563">scans RSS → scores intent → emits JSON lines ──▶</span>
+        <span class="hl">Express</span>
+          <span style="color:#4b5563">stores in</span>
+        <span class="hl3">SQLite</span>
+          <span style="color:#4b5563">→ SSE broadcast</span><br>
+        <span style="color:#4b5563">Telegram alerts sent only for</span>
+        <span class="hl2">medium / high</span>
+        <span style="color:#4b5563">intent leads</span>
+      </div>
+    </div>
+
+    <!-- Live Log -->
+    <div class="card">
+      <div class="log-header">
+        <span class="section-title">Live Log <span style="color:var(--border);font-weight:400">(Python stdout → SSE)</span></span>
+        <label class="as-label"><input type="checkbox" id="auto-scroll" checked> Auto-scroll</label>
+      </div>
+      <div id="log-box"><div class="log-placeholder">Waiting for monitor to start…</div></div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       TAB: LEADS
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-leads">
+
+    <div class="card">
+      <div class="card-row">
+        <span class="card-title" style="margin:0">Recent Leads</span>
+        <span style="font-size:0.75rem;color:var(--muted)" id="leads-meta">0 total</span>
+      </div>
+
+      <!-- Filter pills -->
+      <div class="filter-bar">
+        <button class="filter-pill active" data-filter="all"    onclick="setFilter('all')">All</button>
+        <button class="filter-pill f-high"  data-filter="high"  onclick="setFilter('high')">High Intent</button>
+        <button class="filter-pill f-medium" data-filter="medium" onclick="setFilter('medium')">Medium</button>
+        <button class="filter-pill f-low"   data-filter="low"   onclick="setFilter('low')">Low</button>
+      </div>
+
+      <!-- Table -->
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:80px">Score</th>
+              <th style="width:76px">Intent</th>
+              <th style="width:90px">Subreddit</th>
+              <th>Title</th>
+              <th style="width:110px">Keyword</th>
+              <th style="width:80px">Date</th>
+              <th style="width:110px">Status</th>
+            </tr>
+          </thead>
+          <tbody id="leads-tbody">
+            <tr><td colspan="7" class="empty-msg">No leads yet — start the monitor to begin</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       TAB: CONFIG
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="tab-panel" id="tab-config">
+    <div class="card">
+      <div class="card-title">Configuration</div>
+      <div class="form-grid">
+
+        <div class="field">
+          <label>Telegram Bot Token</label>
+          <input type="password" id="cfg-token" placeholder="Paste new token to update…" autocomplete="off" />
+          <span class="configured no" id="token-status">○ Not configured</span>
+          <span class="hint">Get from @BotFather on Telegram. Leave blank to keep existing.</span>
+        </div>
+
+        <div class="field">
+          <label>Telegram Chat ID</label>
+          <input type="text" id="cfg-chatid" placeholder="-100123456789" />
+          <span class="configured no" id="chatid-status">○ Not configured</span>
+          <span class="hint">Get from @userinfobot on Telegram.</span>
+        </div>
+
+        <div class="field">
+          <label>Check Interval (seconds)</label>
+          <input type="number" id="cfg-interval" min="30" step="30" value="120" />
+          <span class="hint">Minimum 30 s. Takes effect on next start.</span>
+        </div>
+
+        <div class="field"></div>
+
+        <div class="field full">
+          <label>Reddit RSS Feeds (one per line)</label>
+          <textarea id="cfg-feeds" rows="5" placeholder="https://www.reddit.com/r/Entrepreneur/.rss"></textarea>
+          <span class="hint">Format: https://www.reddit.com/r/subreddit/.rss</span>
+        </div>
+
+        <div class="field full">
+          <label>Keywords to Watch (one per line, case-insensitive)</label>
+          <textarea id="cfg-keywords" rows="7"></textarea>
+          <span class="hint">Each keyword is searched in the post title + body. High-intent scoring is separate.</span>
+        </div>
+
+      </div>
+      <div class="save-row">
+        <button class="btn btn-save" onclick="saveConfig()">💾 Save Config</button>
+        <span class="save-msg" id="save-msg">Saved ✓</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Intent Scoring Reference</div>
+      <div class="arch" style="line-height:2">
+        <span class="hl2">HIGH intent (+20 to +40):</span>
+        <span style="color:#94a3b8"> hire, budget, quote, freelancer needed, paying, urgent, contract, asap, build my…</span><br>
+        <span class="hl3">LOW intent  (-10 to -25):</span>
+        <span style="color:#94a3b8"> feedback, showcase, rate my, roast my, what do you think, i made, side project…</span><br>
+        <span style="color:#a78bfa">Score ≥ 60 → HIGH &nbsp;|&nbsp; Score ≥ 25 → MEDIUM &nbsp;|&nbsp; Score &lt; 25 → LOW</span><br>
+        <span style="color:#64748b">Telegram alerts: MEDIUM + HIGH only</span>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+/* ==========================================================================
+   Reddit Lead Intelligence Platform — Dashboard JavaScript
+   ─────────────────────────────────────────────────────────
+   Architecture:
+     EventSource("/api/monitor/stream")  ← SSE from Express
+     fetch("/api/monitor/...")           ← REST calls for start/stop/config/leads
+   ==========================================================================
+*/
+
+const BASE = "/api/monitor";
+
+// ── State ──────────────────────────────────────────────────────────────────
+let leads       = [];      // all loaded leads
+let leadFilter  = "all";   // current filter: all | high | medium | low
+let isRunning   = false;
+
+// ── DOM refs ───────────────────────────────────────────────────────────────
+const logBox    = document.getElementById("log-box");
+const autoScroll= document.getElementById("auto-scroll");
+const badge     = document.getElementById("status-badge");
+const btnStart  = document.getElementById("btn-start");
+const btnStop   = document.getElementById("btn-stop");
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function fmtDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso.replace(" ","T")+"Z");
+  return d.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+}
+
+function logClass(line) {
+  if (line.includes("[MATCH]"))    return "MATCH";
+  if (line.includes("[TELEGRAM]")) return "TELEGRAM";
+  if (line.includes("[FEED]"))     return "FEED";
+  if (line.includes("[ERROR]"))    return "ERROR";
+  if (line.includes("[WARN]"))     return "WARN";
+  if (line.includes("[SYSTEM]"))   return "SYSTEM";
+  if (line.includes("[DB]"))       return "DB";
+  return "";
+}
+
+// ── SSE connection ─────────────────────────────────────────────────────────
+let es = null;
+function connectSSE() {
+  if (es) es.close();
+  es = new EventSource(BASE + "/stream");
+  const sseDot   = document.getElementById("sse-dot");
+  const sseLabel = document.getElementById("sse-label");
+
+  es.onopen = () => {
+    sseDot.classList.add("connected");
+    sseLabel.textContent = "Live";
+  };
+  es.onerror = () => {
+    sseDot.classList.remove("connected");
+    sseLabel.textContent = "SSE";
+  };
+
+  es.addEventListener("log", e => {
+    const { line } = JSON.parse(e.data);
+    appendLog(line);
+  });
+
+  es.addEventListener("lead", e => {
+    const lead = JSON.parse(e.data);
+    // Prepend (newest first); avoid duplicate if already loaded
+    if (!leads.find(l => l.id === lead.id)) {
+      leads.unshift(lead);
+      renderLeads();
+      updateLeadCount();
+      // Flash the Leads tab to draw attention
+      const tab = document.querySelector('[data-tab="leads"]');
+      tab.style.color = "var(--green)";
+      setTimeout(() => { tab.style.color = ""; }, 1500);
+    }
+  });
+
+  es.addEventListener("stats", e => {
+    const s = JSON.parse(e.data);
+    document.getElementById("stat-cycles").textContent  = s.cycles;
+    document.getElementById("stat-matches").textContent = s.matches;
+    document.getElementById("stat-alerts").textContent  = s.alerts_sent;
+  });
+
+  es.addEventListener("status", e => {
+    const { running } = JSON.parse(e.data);
+    if (running !== isRunning) {
+      isRunning = running;
+      updateUI();
+    }
+  });
+}
+
+// ── Log panel ──────────────────────────────────────────────────────────────
+let firstLog = true;
+function appendLog(line) {
+  if (firstLog) { logBox.innerHTML = ""; firstLog = false; }
+  const div = document.createElement("div");
+  div.className = "log-line " + logClass(line);
+  div.textContent = line;
+  logBox.appendChild(div);
+  // Cap at 600 visible lines to keep DOM light
+  while (logBox.children.length > 600) logBox.removeChild(logBox.firstChild);
+  if (autoScroll.checked) logBox.scrollTop = logBox.scrollHeight;
+}
+
+// ── UI state ───────────────────────────────────────────────────────────────
+function updateUI() {
+  if (isRunning) {
+    badge.className   = "badge running";
+    badge.innerHTML   = '<span class="dot"></span><span>Running</span>';
+    btnStart.disabled = true;
+    btnStop.disabled  = false;
+  } else {
+    badge.className   = "badge stopped";
+    badge.innerHTML   = '<span class="dot"></span><span>Stopped</span>';
+    btnStart.disabled = false;
+    btnStop.disabled  = true;
+  }
+}
+
+// ── Controls ───────────────────────────────────────────────────────────────
+async function startMonitor() {
+  btnStart.disabled = true;
+  logBox.innerHTML  = "";
+  firstLog          = true;
+  try {
+    const r = await fetch(BASE + "/start", { method: "POST" });
+    const d = await r.json();
+    if (!d.ok) { alert(d.msg); btnStart.disabled = false; }
+  } catch(e) { alert("Error: " + e); btnStart.disabled = false; }
+}
+
+async function stopMonitor() {
+  btnStop.disabled = true;
+  try { await fetch(BASE + "/stop", { method: "POST" }); }
+  catch(e) { alert("Error: " + e); btnStop.disabled = false; }
+}
+
+// ── Leads table ────────────────────────────────────────────────────────────
+function setFilter(f) {
+  leadFilter = f;
+  document.querySelectorAll(".filter-pill").forEach(p => {
+    p.classList.toggle("active", p.dataset.filter === f);
+  });
+  renderLeads();
+}
+
+function renderLeads() {
+  const rows = leadFilter === "all"
+    ? leads
+    : leads.filter(l => l.intent === leadFilter);
+
+  const meta = document.getElementById("leads-meta");
+  meta.textContent = `${leads.length} total`;
+
+  const tbody = document.getElementById("leads-tbody");
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-msg">No ${leadFilter === "all" ? "" : leadFilter + " intent "} leads found</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(l => `
+    <tr>
+      <td>
+        <div class="score-wrap">
+          <div class="score-bar"><div class="score-fill ${l.intent}" style="width:${l.score}%"></div></div>
+          <span class="score-num">${l.score}</span>
+        </div>
+      </td>
+      <td><span class="intent-badge intent-${l.intent}">${l.intent}</span></td>
+      <td style="color:var(--muted);font-size:0.78rem">${escHtml(l.subreddit)}</td>
+      <td class="title-cell"><a href="${escHtml(l.url)}" target="_blank" rel="noopener"><span class="title-text">${escHtml(l.title)}</span></a></td>
+      <td><span class="kw-chip">${escHtml(l.matched_keyword)}</span></td>
+      <td class="date-cell">${fmtDate(l.created_at)}</td>
+      <td>
+        <select class="status-sel s-${l.status}" onchange="updateLeadStatus(${l.id},this.value,this)">
+          <option value="new"       ${l.status==="new"?"selected":""}>🔵 New</option>
+          <option value="contacted" ${l.status==="contacted"?"selected":""}>📧 Contacted</option>
+          <option value="ignored"   ${l.status==="ignored"?"selected":""}>🚫 Ignored</option>
+          <option value="won"       ${l.status==="won"?"selected":""}>✅ Won</option>
+        </select>
+      </td>
+    </tr>
+  `).join("");
+}
+
+function updateLeadCount() {
+  document.getElementById("leads-count").textContent = leads.length;
+  document.getElementById("leads-meta").textContent  = leads.length + " total";
+}
+
+async function updateLeadStatus(id, status, sel) {
+  const old = leads.find(l => l.id === id);
+  if (old) old.status = status;
+  // Update CSS class on the select element
+  sel.className = "status-sel s-" + status;
+  try {
+    await fetch(`${BASE}/leads/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+  } catch(e) { console.warn("Status update failed:", e); }
+}
+
+// ── Config form ────────────────────────────────────────────────────────────
+async function loadConfig() {
+  try {
+    const r    = await fetch(BASE + "/config");
+    const data = await r.json();
+    // Token: never shown — only show configured status
+    const tokenEl = document.getElementById("token-status");
+    if (data.token_configured) {
+      tokenEl.textContent = "● Configured"; tokenEl.className = "configured yes";
+    } else {
+      tokenEl.textContent = "○ Not configured"; tokenEl.className = "configured no";
+    }
+    // Chat ID: show partially masked display, but also put full value in field for editing
+    const chatEl = document.getElementById("chatid-status");
+    if (data.chat_id_configured) {
+      chatEl.textContent = "● Configured"; chatEl.className = "configured yes";
+      document.getElementById("cfg-chatid").placeholder = data.chat_id_display || "configured";
+    } else {
+      chatEl.textContent = "○ Not configured"; chatEl.className = "configured no";
+    }
+    document.getElementById("cfg-interval").value  = data.interval;
+    document.getElementById("cfg-feeds").value     = (data.feeds || []).join("\n");
+    document.getElementById("cfg-keywords").value  = (data.keywords || []).join("\n");
+  } catch(e) { console.warn("Config load failed:", e); }
+}
+
+async function saveConfig() {
+  const tokenVal = document.getElementById("cfg-token").value.trim();
+  const chatVal  = document.getElementById("cfg-chatid").value.trim();
+  const feeds    = document.getElementById("cfg-feeds").value.split("\n").map(s=>s.trim()).filter(Boolean);
+  const keywords = document.getElementById("cfg-keywords").value.split("\n").map(s=>s.trim()).filter(Boolean);
+
+  const payload = {
+    interval: parseInt(document.getElementById("cfg-interval").value, 10),
+    feeds, keywords,
+  };
+  // Only include token/chatid if user typed something new
+  if (tokenVal) payload.bot_token = tokenVal;
+  if (chatVal)  payload.chat_id   = chatVal;
+
+  try {
+    const r = await fetch(BASE + "/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      // Clear sensitive fields after save
+      document.getElementById("cfg-token").value = "";
+      const msg = document.getElementById("save-msg");
+      msg.style.opacity = "1";
+      setTimeout(() => { msg.style.opacity = "0"; }, 2500);
+      await loadConfig(); // refresh status indicators
+    }
+  } catch(e) { alert("Save failed: " + e); }
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("active", p.id === "tab-" + name));
+}
+document.querySelectorAll(".tab-btn").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.tab)));
+
+// ── Initial data load ──────────────────────────────────────────────────────
+async function loadLeads() {
+  try {
+    const r = await fetch(BASE + "/leads");
+    const d = await r.json();
+    leads = d.leads || [];
+    renderLeads();
+    updateLeadCount();
+  } catch(e) { console.warn("Leads load failed:", e); }
+}
+
+async function loadRecentLogs() {
+  try {
+    const r = await fetch(BASE + "/logs");
+    const d = await r.json();
+    if (d.lines && d.lines.length > 0) {
+      d.lines.forEach(appendLog);
+    }
+  } catch(e) { console.warn("Logs load failed:", e); }
+}
+
+// ── Bootstrap ──────────────────────────────────────────────────────────────
+connectSSE();
+loadLeads();
+loadRecentLogs();
+loadConfig();
+</script>
+
+</body>
+</html>
+
