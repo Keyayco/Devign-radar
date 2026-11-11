@@ -7,6 +7,7 @@ Uses feedparser + requests. No database, no Reddit API auth required.
 
 import feedparser
 import requests
+import os
 import time
 
 # =============================================================================
@@ -14,10 +15,10 @@ import time
 # =============================================================================
 
 # Your Telegram bot token (from @BotFather on Telegram)
-TELEGRAM_BOT_TOKEN = "8968597568:AAEyUbpcjj_e8C-ZSWYHda3KEXUY6I7khsY"
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 
 # Your Telegram chat ID (use @userinfobot to find yours)
-TELEGRAM_CHAT_ID = "7116100851"
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 # Reddit RSS feeds to monitor.
 # Format: https://www.reddit.com/r/<subreddit>/.rss
